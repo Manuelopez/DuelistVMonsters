@@ -1,0 +1,28 @@
+{ "frames": [
+   {
+    "filename": "spritesheet (player).ase",
+    "frame": { "x": 0, "y": 0, "w": 240, "h": 135 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 240, "h": 135 },
+    "sourceSize": { "w": 240, "h": 135 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://github.com/LibreSprite/LibreSprite/",
+  "version": "1.0",
+  "image": "/Users/manuelopez/Desktop/code/graduated/dishwasher/resources/player.png",
+  "format": "RGBA8888",
+  "size": { "w": 240, "h": 135 },
+  "scale": "1",
+  "frameTags": [
+  ],
+  "layers": [
+   { "name": "player", "opacity": 255, "blendMode": "normal" },
+   { "name": "goblin", "opacity": 255, "blendMode": "normal" },
+   { "name": "troll", "opacity": 255, "blendMode": "normal" },
+   { "name": "card_fireball", "opacity": 255, "blendMode": "normal" }
+  ]
+ }
+}
