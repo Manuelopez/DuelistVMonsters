@@ -255,8 +255,12 @@ func main() {
 
 	var runningMultiplier float32 = 1
 
+	// grabbed entity
+	var grabbedEntity *Entity = nil
+
 	for !rl.WindowShouldClose() {
-		fmt.Println(camera.Target)
+		// :clean :reset
+
 		worldFrame = WorldFrame{}
 
 		// :input
@@ -347,31 +351,42 @@ func main() {
 
 			}
 
-			// :click handler
+			// :mouse :click handler
 			{
 
-				var isMouseLeftPressed bool = rl.IsMouseButtonPressed(rl.MouseButtonLeft)
+				var IsMouseButtonDown bool = rl.IsMouseButtonDown(rl.MouseButtonLeft)
 				var selectedEntity *Entity = worldFrame.SelectedEntity
 
-				if isMouseLeftPressed {
-					isMouseLeftPressed = false
-					if selectedEntity != nil {
-						selectedEntity.Health -= 1
-						if selectedEntity.Health <= 0 {
-							destroyEntity(selectedEntity)
-						}
+				if IsMouseButtonDown {
+					IsMouseButtonDown = false
+					if selectedEntity != nil && selectedEntity.Type == ARCH_CARD_FIREBALL {
+						grabbedEntity = selectedEntity
+
 					}
 
 				} else if rl.IsMouseButtonPressed(rl.MouseButtonRight) {
 					/* inputAxis = rl.Vector2Subtract(terminalPoint, playerEntity.Position) */
 				}
 
+				if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
+					grabbedEntity = nil
+				}
+
 			}
 
-			// :update player
+			// :update
 			{
+				// :update :player
 				inputAxis = rl.Vector2Normalize(inputAxis)
 				playerEntity.Position = rl.Vector2Add(playerEntity.Position, rl.Vector2Scale(inputAxis, (100*rl.GetFrameTime())*runningMultiplier))
+
+				// :update grabbedEntity position
+
+				if grabbedEntity != nil {
+					fmt.Println("grabbedEntity not nil!!!")
+					grabbedEntity.Position.X = mousePositionWorld.X
+					grabbedEntity.Position.Y = mousePositionWorld.Y
+				}
 			}
 
 			// :render
@@ -400,9 +415,18 @@ func main() {
 
 							yPosition = yPosition + ((screenHeight / 2) / 3)
 
-							entity.Position.X = float32(xPosition) + float32(sprite.Image.Width/2)
-							entity.Position.Y = float32(yPosition) + float32(sprite.Image.Height/2)
-							rl.DrawTexture(sprite.Image, xPosition, yPosition, entityColor)
+							if entity == grabbedEntity {
+
+								xPosition = int32(entity.Position.X)
+								// move to bottom
+								yPosition = int32(entity.Position.Y)
+
+							} else {
+								entity.Position.X = float32(xPosition) + float32(sprite.Image.Width/2)
+								entity.Position.Y = float32(yPosition) 
+							}
+
+							rl.DrawTexture(sprite.Image, xPosition-(sprite.Image.Width/2), yPosition+(sprite.Image.Height/2), entityColor)
 
 							numberOfCards += 1
 							// do nothig for now
