@@ -247,12 +247,13 @@ func main() {
 
 	// :input movement variables
 	var inputAxis rl.Vector2 = rl.Vector2{X: 0, Y: 0}
-	var terminalPoint rl.Vector2
 
 	/// remove bellow
 	rl.SetTargetFPS(60)
 
 	defer rl.CloseWindow()
+
+	var runningMultiplier float32 = 1
 
 	for !rl.WindowShouldClose() {
 		fmt.Println(camera.Target)
@@ -260,12 +261,27 @@ func main() {
 
 		// :input
 		{
-
-			if rl.Vector2Distance(playerEntity.Position, terminalPoint) <
-				PLAYER_MOVEMENT_RADIUS {
-				inputAxis = rl.Vector2{X: 0, Y: 0}
-				terminalPoint = rl.Vector2{X: 0, Y: 0}
+			inputAxis = rl.Vector2{X: 0, Y: 0}
+			if rl.IsKeyDown(rl.KeyLeftShift) {
+				runningMultiplier = 1.5
+			} else {
+				runningMultiplier = 1
 			}
+
+			if rl.IsKeyDown(rl.KeyS) {
+				inputAxis.Y += 1
+			}
+			if rl.IsKeyDown(rl.KeyW) {
+				inputAxis.Y -= 1
+			}
+			if rl.IsKeyDown(rl.KeyD) {
+				inputAxis.X += 1
+			}
+			if rl.IsKeyDown(rl.KeyA) {
+
+				inputAxis.X -= 1
+			}
+
 		}
 
 		// :camera
@@ -347,17 +363,16 @@ func main() {
 					}
 
 				} else if rl.IsMouseButtonPressed(rl.MouseButtonRight) {
-					terminalPoint = mousePositionWorld
-					inputAxis = rl.Vector2Subtract(terminalPoint, playerEntity.Position)
+					/* inputAxis = rl.Vector2Subtract(terminalPoint, playerEntity.Position) */
 				}
 
 			}
 
-			inputAxis = rl.Vector2Normalize(inputAxis)
-
-			fmt.Println(inputAxis)
-
-			playerEntity.Position = rl.Vector2Add(playerEntity.Position, rl.Vector2Scale(inputAxis, 100*rl.GetFrameTime()))
+			// :update player
+			{
+				inputAxis = rl.Vector2Normalize(inputAxis)
+				playerEntity.Position = rl.Vector2Add(playerEntity.Position, rl.Vector2Scale(inputAxis, (100*rl.GetFrameTime())*runningMultiplier))
+			}
 
 			// :render
 			{
