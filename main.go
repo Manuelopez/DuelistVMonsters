@@ -214,7 +214,7 @@ func main() {
 	sprites[SPRITE_GOBLIN] = Sprite{Image: rl.LoadTexture("./resources/goblin.png")}
 	sprites[SPRITE_TROLL] = Sprite{Image: rl.LoadTexture("./resources/troll.png")}
 	sprites[SPRITE_CARD_FIREBALL] =
-		Sprite{Image: rl.LoadTexture("./resources/troll.png")}
+		Sprite{Image: rl.LoadTexture("./resources/card_fireball.png")}
 
 	for i := 0; i < 2; i++ {
 		var en *Entity = createEntity()
@@ -377,19 +377,55 @@ func main() {
 			// :render
 			{
 
+				var numberOfCards = 0
 				for i := 0; i < MAX_ENTITY_COUNT; i++ {
 					var entity *Entity = &world.Entities[i]
 					if entity.IsValid {
+
+						var entityColor rl.Color = rl.White
+						if worldFrame.SelectedEntity == entity {
+							entityColor = rl.Red
+						}
 						switch entity.Type {
 
-						default:
-
+						case ARCH_CARD_FIREBALL:
 							var sprite *Sprite = getSprite(entity.SpriteId)
 							var entityColor rl.Color = rl.White
 							if worldFrame.SelectedEntity == entity {
 								entityColor = rl.Red
 							}
+							xPosition := int32(camera.Target.X - float32(sprite.Image.Width/2))
+							// move to bottom
+							yPosition := int32(camera.Target.Y - float32(sprite.Image.Height))
+
+							yPosition = yPosition + ((screenHeight / 2) / 3)
+
+							entity.Position.X = float32(xPosition) + float32(sprite.Image.Width/2)
+							entity.Position.Y = float32(yPosition) + float32(sprite.Image.Height/2)
+							rl.DrawTexture(sprite.Image, xPosition, yPosition, entityColor)
+
+							numberOfCards += 1
+							// do nothig for now
+
+						default:
+							var sprite *Sprite = getSprite(entity.SpriteId)
 							rl.DrawTexture(sprite.Image, int32(entity.Position.X-float32(sprite.Image.Width/2)), int32(entity.Position.Y-float32(sprite.Image.Height/2)), entityColor)
+
+						}
+					}
+
+				}
+
+			}
+
+			// :render ui
+			{
+
+				for i := 0; i < MAX_HAND_COUNT; i++ {
+					var entity *Entity = &hand.Cards[i]
+					if entity.IsValid {
+						switch entity.Type {
+						default:
 
 						}
 					}
