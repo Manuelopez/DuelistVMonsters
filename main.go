@@ -369,6 +369,7 @@ func main() {
 				}
 
 				if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
+
 					grabbedEntity = nil
 				}
 
