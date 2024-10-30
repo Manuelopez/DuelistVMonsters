@@ -44,6 +44,7 @@ const (
 	SPRITE_TROLL
 	SPRITE_CARD_FIREBALL
 	SPRITE_ATTACK_FIREBALL
+	SPRITE_ATTACK_BASIC
 	SPRITE_MAX
 )
 
@@ -226,6 +227,15 @@ func setupAttackFireball(en *Entity) {
 	en.Range = 100
 }
 
+func setupAttackBasic(en *Entity) {
+	en.Type = ARCH_ATTACK
+	en.SpriteId = SPRITE_ATTACK_BASIC
+	en.Damage = 1
+	en.Speed = 150
+	en.Health = 1
+	en.Range = 85
+}
+
 /**/
 func main() {
 	rl.SetConfigFlags(rl.FlagVsyncHint | rl.FlagWindowHighdpi)
@@ -251,9 +261,10 @@ func main() {
 	sprites[SPRITE_TROLL] = Sprite{Image: rl.LoadTexture("./resources/troll.png")}
 	sprites[SPRITE_CARD_FIREBALL] =
 		Sprite{Image: rl.LoadTexture("./resources/card_fireball.png")}
-
 	sprites[SPRITE_ATTACK_FIREBALL] =
 		Sprite{Image: rl.LoadTexture("./resources/attack_fireball.png")}
+	sprites[SPRITE_ATTACK_BASIC] =
+		Sprite{Image: rl.LoadTexture("./resources/basic_attack.png")}
 
 	for i := 0; i < 2; i++ {
 		var en *Entity = createEntity()
@@ -396,11 +407,13 @@ func main() {
 
 				var top20Percent float32 = float32(screenHeight) - (float32(screenHeight) * 0.20)
 
-				var IsMouseButtonDown bool = rl.IsMouseButtonDown(rl.MouseButtonLeft)
+				var IsMouseButtonLeftDown bool = rl.IsMouseButtonDown(rl.MouseButtonLeft)
+				var IsMouseButtonLeftRelased bool = rl.IsMouseButtonReleased(rl.MouseButtonLeft)
+				var IsMouseButtonLeftPressed bool = rl.IsMouseButtonPressed(rl.MouseButtonLeft)
 				var selectedEntity *Entity = worldFrame.SelectedEntity
 
-				if IsMouseButtonDown {
-					IsMouseButtonDown = false
+				if IsMouseButtonLeftDown {
+					IsMouseButtonLeftDown = false
 					if selectedEntity != nil && selectedEntity.Type == ARCH_CARD {
 						grabbedEntity = selectedEntity
 					}
@@ -414,8 +427,17 @@ func main() {
 				} else if rl.IsMouseButtonPressed(rl.MouseButtonRight) {
 					/* inputAxis = rl.Vector2Subtract(terminalPoint, playerEntity.Position) */
 				}
+				if IsMouseButtonLeftPressed {
+					IsMouseButtonLeftPressed = false
+					var basicAttack *Entity = createEntity()
+					setupAttackBasic(basicAttack)
+					basicAttack.Position = playerEntity.Position
+					basicAttack.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(mousePositionWorld, playerEntity.Position)))
+					basicAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(basicAttack.Range))
+				}
 
-				if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
+				if IsMouseButtonLeftRelased {
+					IsMouseButtonLeftRelased = false
 					if grabbedEntity != nil {
 						if mousePositionScreen.Y < top20Percent {
 							// :TODO do the attack on the direction mouse poing to
@@ -454,9 +476,10 @@ func main() {
 
 						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())))
 					}
-					entity.CollisionRectangle.X = entity.Position.X
-					entity.CollisionRectangle.Y = entity.Position.Y
+
 					var sprite *Sprite = getSprite(entity.SpriteId)
+					entity.CollisionRectangle.X = (entity.Position.X - float32(sprite.Image.Width)/2)
+					entity.CollisionRectangle.Y = entity.Position.Y - float32(sprite.Image.Height/2)
 					entity.CollisionRectangle.Width = float32(sprite.Image.Width)
 					entity.CollisionRectangle.Height = float32(sprite.Image.Height)
 
@@ -552,6 +575,8 @@ func main() {
 
 						default:
 							var sprite *Sprite = getSprite(entity.SpriteId)
+							// show collisions
+							//rl.DrawRectangle(int32(entity.CollisionRectangle.X), int32(entity.CollisionRectangle.Y), int32(entity.CollisionRectangle.Width), int32(entity.CollisionRectangle.Height), rl.Blue)
 							rl.DrawTexture(sprite.Image, int32(entity.Position.X-float32(sprite.Image.Width/2)), int32(entity.Position.Y-float32(sprite.Image.Height/2)), entityColor)
 
 						}
