@@ -26,6 +26,8 @@ const (
 	ARCH_GOBLIN        EntityArchType = 2
 	ARCH_PLAYER        EntityArchType = 3
 	ARCH_CARD_FIREBALL EntityArchType = 4
+	ARCH_CARD          EntityArchType = 5
+	ARCH_ATTACK        EntityArchType = 6
 )
 
 type Sprite struct {
@@ -41,15 +43,30 @@ const (
 	SPRITE_GOBLIN
 	SPRITE_TROLL
 	SPRITE_CARD_FIREBALL
+	SPRITE_ATTACK_FIREBALL
 	SPRITE_MAX
 )
 
 type Entity struct {
-	Position rl.Vector2
-	IsValid  bool
-	Type     EntityArchType
-	SpriteId SpriteId
-	Health   int
+	Position  rl.Vector2
+	IsValid   bool
+	Type      EntityArchType
+	SpriteId  SpriteId
+	Health    int
+	inputAxis rl.Vector2
+
+	// for cards
+	Range  int32
+	Width  int32
+	Damage int32
+	Speed  int32
+
+	// for attacks
+	MaxPosition rl.Vector2
+}
+
+type Card struct {
+	base Entity
 }
 
 type Hand struct {
@@ -151,23 +168,28 @@ func createEntity() *Entity {
 
 	assert(entityFound != nil, "max # of entities reached")
 	entityFound.IsValid = true
+
+	entityFound.inputAxis = rl.Vector2{X: 0, Y: 0}
 	return entityFound
 }
 
 func destroyEntity(en *Entity) {
-	en = nil
+	*en = Entity{}
+	en.IsValid = false
 }
 
 func setupTroll(en *Entity) {
 	en.Type = ARCH_TROLL
 	en.SpriteId = SPRITE_TROLL
 	en.Health = TROLL_HEALTH
+
 }
 
 func setupPlayer(en *Entity) {
 	en.Type = ARCH_PLAYER
 	en.SpriteId = SPRITE_PLAYER
 	en.Health = TROLL_HEALTH
+	en.Speed = 100
 }
 
 func setupGoblin(en *Entity) {
@@ -186,8 +208,18 @@ func getSprite(id SpriteId) *Sprite {
 }
 
 func setupCardFireball(en *Entity) {
-	en.Type = ARCH_CARD_FIREBALL
+	en.Type = ARCH_CARD
 	en.SpriteId = SPRITE_CARD_FIREBALL
+	en.Range = 10
+	en.Width = 5
+	en.Damage = 2
+}
+
+func setupAttackFireball(en *Entity) {
+	en.Type = ARCH_ATTACK
+	en.SpriteId = SPRITE_ATTACK_FIREBALL
+	en.Damage = 2
+	en.Speed = 200
 }
 
 /**/
@@ -215,6 +247,9 @@ func main() {
 	sprites[SPRITE_TROLL] = Sprite{Image: rl.LoadTexture("./resources/troll.png")}
 	sprites[SPRITE_CARD_FIREBALL] =
 		Sprite{Image: rl.LoadTexture("./resources/card_fireball.png")}
+
+	sprites[SPRITE_ATTACK_FIREBALL] =
+		Sprite{Image: rl.LoadTexture("./resources/attack_fireball.png")}
 
 	for i := 0; i < 2; i++ {
 		var en *Entity = createEntity()
@@ -246,7 +281,6 @@ func main() {
 	}
 
 	// :input movement variables
-	var inputAxis rl.Vector2 = rl.Vector2{X: 0, Y: 0}
 
 	/// remove bellow
 	rl.SetTargetFPS(60)
@@ -265,7 +299,7 @@ func main() {
 
 		// :input
 		{
-			inputAxis = rl.Vector2{X: 0, Y: 0}
+			playerEntity.inputAxis = rl.Vector2{X: 0, Y: 0}
 			if rl.IsKeyDown(rl.KeyLeftShift) {
 				runningMultiplier = 1.5
 			} else {
@@ -273,17 +307,16 @@ func main() {
 			}
 
 			if rl.IsKeyDown(rl.KeyS) {
-				inputAxis.Y += 1
+				playerEntity.inputAxis.Y += 1
 			}
 			if rl.IsKeyDown(rl.KeyW) {
-				inputAxis.Y -= 1
+				playerEntity.inputAxis.Y -= 1
 			}
 			if rl.IsKeyDown(rl.KeyD) {
-				inputAxis.X += 1
+				playerEntity.inputAxis.X += 1
 			}
 			if rl.IsKeyDown(rl.KeyA) {
-
-				inputAxis.X -= 1
+				playerEntity.inputAxis.X -= 1
 			}
 
 		}
@@ -302,7 +335,8 @@ func main() {
 		// :world entities positions
 		{
 			rl.BeginMode2D(camera)
-			var mousePositionWorld = rl.GetScreenToWorld2D(rl.GetMousePosition(), camera)
+			var mousePositionScreen rl.Vector2 = rl.GetMousePosition()
+			var mousePositionWorld rl.Vector2 = rl.GetScreenToWorld2D(mousePositionScreen, camera)
 
 			// var mouseTileX int = int(worldPositionToTilePosition(mousePositionWorld.X))
 			// var mouseTileY int = int(worldPositionToTilePosition(mousePositionWorld.Y))
@@ -354,14 +388,21 @@ func main() {
 			// :mouse :click handler
 			{
 
+				var top20Percent float32 = float32(screenHeight) - (float32(screenHeight) * 0.20)
+
 				var IsMouseButtonDown bool = rl.IsMouseButtonDown(rl.MouseButtonLeft)
 				var selectedEntity *Entity = worldFrame.SelectedEntity
 
 				if IsMouseButtonDown {
 					IsMouseButtonDown = false
-					if selectedEntity != nil && selectedEntity.Type == ARCH_CARD_FIREBALL {
+					if selectedEntity != nil && selectedEntity.Type == ARCH_CARD {
 						grabbedEntity = selectedEntity
+					}
 
+					if selectedEntity != nil {
+						if mousePositionScreen.Y < top20Percent {
+							// :TODO show attack direction league like
+						}
 					}
 
 				} else if rl.IsMouseButtonPressed(rl.MouseButtonRight) {
@@ -369,22 +410,33 @@ func main() {
 				}
 
 				if rl.IsMouseButtonReleased(rl.MouseButtonLeft) {
+					if grabbedEntity != nil {
+						if mousePositionScreen.Y < top20Percent {
+							// :TODO do the attack on the direction mouse poing to
+							var fireballAttack *Entity = createEntity()
+							setupAttackFireball(fireballAttack)
+							fireballAttack.Position = playerEntity.Position
+							fireballAttack.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(mousePositionWorld, playerEntity.Position)))
+							destroyEntity(grabbedEntity)
+						}
 
-					grabbedEntity = nil
+						grabbedEntity = nil
+					}
+
 				}
 
 			}
 
 			// :update
 			{
-				// :update :player
-				inputAxis = rl.Vector2Normalize(inputAxis)
-				playerEntity.Position = rl.Vector2Add(playerEntity.Position, rl.Vector2Scale(inputAxis, (100*rl.GetFrameTime())*runningMultiplier))
-
 				// :update grabbedEntity position
 
+				for i := 0; i < MAX_ENTITY_COUNT; i++ {
+					var entity *Entity = &world.Entities[i]
+					entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())*runningMultiplier))
+				}
+
 				if grabbedEntity != nil {
-					fmt.Println("grabbedEntity not nil!!!")
 					grabbedEntity.Position.X = mousePositionWorld.X
 					grabbedEntity.Position.Y = mousePositionWorld.Y
 				}
@@ -404,15 +456,15 @@ func main() {
 						}
 						switch entity.Type {
 
-						case ARCH_CARD_FIREBALL:
+						case ARCH_CARD:
 							var sprite *Sprite = getSprite(entity.SpriteId)
 							var entityColor rl.Color = rl.White
 							if worldFrame.SelectedEntity == entity {
 								entityColor = rl.Red
 							}
-							xPosition := int32(camera.Target.X - float32(sprite.Image.Width/2))
+							xPosition := int32(camera.Target.X)
 							// move to bottom
-							yPosition := int32(camera.Target.Y - float32(sprite.Image.Height))
+							yPosition := int32(camera.Target.Y) - (sprite.Image.Height / 2)
 
 							yPosition = yPosition + ((screenHeight / 2) / 3)
 
@@ -423,11 +475,11 @@ func main() {
 								yPosition = int32(entity.Position.Y)
 
 							} else {
-								entity.Position.X = float32(xPosition) + float32(sprite.Image.Width/2)
-								entity.Position.Y = float32(yPosition) 
+								entity.Position.X = float32(xPosition)
+								entity.Position.Y = float32(yPosition)
 							}
 
-							rl.DrawTexture(sprite.Image, xPosition-(sprite.Image.Width/2), yPosition+(sprite.Image.Height/2), entityColor)
+							rl.DrawTexture(sprite.Image, xPosition-(sprite.Image.Width/2), yPosition-(sprite.Image.Height/2), entityColor)
 
 							numberOfCards += 1
 							// do nothig for now
