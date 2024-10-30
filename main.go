@@ -52,7 +52,7 @@ type Entity struct {
 	IsValid            bool
 	Type               EntityArchType
 	SpriteId           SpriteId
-	Health             int
+	Health             int32
 	inputAxis          rl.Vector2
 	CollisionRectangle rl.Rectangle
 
@@ -211,16 +211,19 @@ func getSprite(id SpriteId) *Sprite {
 func setupCardFireball(en *Entity) {
 	en.Type = ARCH_CARD
 	en.SpriteId = SPRITE_CARD_FIREBALL
-	en.Range = 10
+	en.Range = 100
 	en.Width = 5
 	en.Damage = 2
+	en.Health = 1
 }
 
 func setupAttackFireball(en *Entity) {
 	en.Type = ARCH_ATTACK
 	en.SpriteId = SPRITE_ATTACK_FIREBALL
-	en.Damage = 2
+	en.Damage = 4
 	en.Speed = 200
+	en.Health = 1
+	en.Range = 100
 }
 
 /**/
@@ -291,7 +294,6 @@ func main() {
 	var runningMultiplier float32 = 1
 
 	//
-	var collisionHappend bool = false
 
 	// grabbed entity
 	var grabbedEntity *Entity = nil
@@ -420,6 +422,7 @@ func main() {
 							var fireballAttack *Entity = createEntity()
 							setupAttackFireball(fireballAttack)
 							fireballAttack.Position = playerEntity.Position
+							fireballAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(fireballAttack.Range))
 							fireballAttack.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(mousePositionWorld, playerEntity.Position)))
 							destroyEntity(grabbedEntity)
 						}
@@ -437,12 +440,30 @@ func main() {
 
 				for i := 0; i < MAX_ENTITY_COUNT; i++ {
 					var entity *Entity = &world.Entities[i]
-					entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())*runningMultiplier))
+					if entity.Type == ARCH_ATTACK {
+						if entity.Position.X > entity.MaxPosition.X || entity.Position.Y > entity.MaxPosition.Y {
+							destroyEntity(entity)
+							continue
+						}
+					}
+					// :update :positions
+					if entity.Type == ARCH_PLAYER {
+
+						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())*runningMultiplier))
+					} else {
+
+						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())))
+					}
 					entity.CollisionRectangle.X = entity.Position.X
 					entity.CollisionRectangle.Y = entity.Position.Y
 					var sprite *Sprite = getSprite(entity.SpriteId)
 					entity.CollisionRectangle.Width = float32(sprite.Image.Width)
 					entity.CollisionRectangle.Height = float32(sprite.Image.Height)
+
+					// :update :existance
+					if entity.Health <= 0 {
+						destroyEntity(entity)
+					}
 				}
 
 				if grabbedEntity != nil {
@@ -455,15 +476,33 @@ func main() {
 
 				for i := 0; i < MAX_ENTITY_COUNT; i++ {
 
-					var otherEntity *Entity = &world.Entities[i]
-					if otherEntity.Type == ARCH_PLAYER || !otherEntity.IsValid {
-						continue
-					}
+					var firstEntity *Entity = &world.Entities[i]
+					if firstEntity.Type == ARCH_ATTACK {
 
-					if rl.CheckCollisionRecs(otherEntity.CollisionRectangle, playerEntity.CollisionRectangle) {
-            fmt.Println(otherEntity)
-						collisionHappend = true
-						break
+						var didGlobalCollisionHappen bool = false
+						for j := 0; j < MAX_ENTITY_COUNT; j++ {
+
+							var didLocalCollisionHappend bool = false
+							var secondEntity *Entity = &world.Entities[j]
+							if firstEntity == secondEntity {
+								continue
+							}
+
+							if secondEntity.Type == ARCH_ATTACK || secondEntity.Type == ARCH_CARD || secondEntity.Type == ARCH_PLAYER {
+								continue
+							}
+
+							didLocalCollisionHappend = rl.CheckCollisionRecs(firstEntity.CollisionRectangle, secondEntity.CollisionRectangle)
+							if didLocalCollisionHappend {
+								secondEntity.Health -= firstEntity.Damage
+								didGlobalCollisionHappen = didLocalCollisionHappend
+							}
+
+						}
+
+						if didGlobalCollisionHappen {
+							destroyEntity(firstEntity)
+						}
 					}
 
 				}
@@ -473,9 +512,6 @@ func main() {
 			{
 
 				var numberOfCards = 0
-				if collisionHappend {
-					rl.DrawText("COLLISION HAPPEND", int32(camera.Target.X), int32(camera.Target.Y), 8, rl.Black)
-				}
 				for i := 0; i < MAX_ENTITY_COUNT; i++ {
 					var entity *Entity = &world.Entities[i]
 					if entity.IsValid {
