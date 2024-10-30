@@ -48,12 +48,13 @@ const (
 )
 
 type Entity struct {
-	Position  rl.Vector2
-	IsValid   bool
-	Type      EntityArchType
-	SpriteId  SpriteId
-	Health    int
-	inputAxis rl.Vector2
+	Position           rl.Vector2
+	IsValid            bool
+	Type               EntityArchType
+	SpriteId           SpriteId
+	Health             int
+	inputAxis          rl.Vector2
+	CollisionRectangle rl.Rectangle
 
 	// for cards
 	Range  int32
@@ -289,6 +290,9 @@ func main() {
 
 	var runningMultiplier float32 = 1
 
+	//
+	var collisionHappend bool = false
+
 	// grabbed entity
 	var grabbedEntity *Entity = nil
 
@@ -434,6 +438,11 @@ func main() {
 				for i := 0; i < MAX_ENTITY_COUNT; i++ {
 					var entity *Entity = &world.Entities[i]
 					entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())*runningMultiplier))
+					entity.CollisionRectangle.X = entity.Position.X
+					entity.CollisionRectangle.Y = entity.Position.Y
+					var sprite *Sprite = getSprite(entity.SpriteId)
+					entity.CollisionRectangle.Width = float32(sprite.Image.Width)
+					entity.CollisionRectangle.Height = float32(sprite.Image.Height)
 				}
 
 				if grabbedEntity != nil {
@@ -441,11 +450,32 @@ func main() {
 					grabbedEntity.Position.Y = mousePositionWorld.Y
 				}
 			}
+			// :collision
+			{
+
+				for i := 0; i < MAX_ENTITY_COUNT; i++ {
+
+					var otherEntity *Entity = &world.Entities[i]
+					if otherEntity.Type == ARCH_PLAYER || !otherEntity.IsValid {
+						continue
+					}
+
+					if rl.CheckCollisionRecs(otherEntity.CollisionRectangle, playerEntity.CollisionRectangle) {
+            fmt.Println(otherEntity)
+						collisionHappend = true
+						break
+					}
+
+				}
+			}
 
 			// :render
 			{
 
 				var numberOfCards = 0
+				if collisionHappend {
+					rl.DrawText("COLLISION HAPPEND", int32(camera.Target.X), int32(camera.Target.Y), 8, rl.Black)
+				}
 				for i := 0; i < MAX_ENTITY_COUNT; i++ {
 					var entity *Entity = &world.Entities[i]
 					if entity.IsValid {
