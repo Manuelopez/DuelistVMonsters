@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	rl "github.com/gen2brain/raylib-go/raylib"
 	"math"
+
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 // :globals constants
@@ -11,9 +12,9 @@ const (
 	MAX_ENTITY_COUNT               = 1024
 	MAX_HAND_COUNT                 = 40
 	entitySelectionRadius  float32 = 10.0
-	PLAYER_HEALTH                  = 10
-	TROLL_HEALTH                   = 3
-	GOBLIN_HEALTH                  = 3
+	PLAYER_HEALTH                  = 100
+	TROLL_HEALTH                   = 10
+	GOBLIN_HEALTH                  = 10
 	PLAYER_MOVEMENT_RADIUS float32 = 1
 )
 
@@ -184,13 +185,15 @@ func setupTroll(en *Entity) {
 	en.Type = ARCH_TROLL
 	en.SpriteId = SPRITE_TROLL
 	en.Health = TROLL_HEALTH
+	en.Damage = 30
+	en.Speed = 50
 
 }
 
 func setupPlayer(en *Entity) {
 	en.Type = ARCH_PLAYER
 	en.SpriteId = SPRITE_PLAYER
-	en.Health = TROLL_HEALTH
+	en.Health = 100
 	en.Speed = 100
 }
 
@@ -198,6 +201,8 @@ func setupGoblin(en *Entity) {
 	en.Type = ARCH_GOBLIN
 	en.SpriteId = SPRITE_GOBLIN
 	en.Health = GOBLIN_HEALTH
+	en.Damage = 10
+	en.Speed = 50
 }
 
 var sprites [SPRITE_MAX]Sprite
@@ -236,12 +241,22 @@ func setupAttackBasic(en *Entity) {
 	en.Range = 85
 }
 
-/**/
 func main() {
+
 	rl.SetConfigFlags(rl.FlagVsyncHint | rl.FlagWindowHighdpi)
 
 	const screenWidth int32 = 800
 	const screenHeight int32 = 450
+
+	var spawnTrollRate float32 = 4
+	var spawnGlobinRate float32 = 2
+	var spawnTrollPosition rl.Vector2 = rl.Vector2{X: 30, Y: 40}
+	var spawnGoblinPosition rl.Vector2 = rl.Vector2{X: 20, Y: 20}
+	var spawnTrollAmount int32 = 1
+	var spawnGoblinAmount int32 = 2
+	//var maxEnemyToSpawn int32 = 12
+	var elapsedTimeGoblin float32 = 0
+	var elapsedTimeTroll float32 = 0
 
 	rl.InitWindow(screenWidth, screenHeight, "Dueling Monsters")
 
@@ -266,17 +281,17 @@ func main() {
 	sprites[SPRITE_ATTACK_BASIC] =
 		Sprite{Image: rl.LoadTexture("./resources/basic_attack.png")}
 
-	for i := 0; i < 2; i++ {
-		var en *Entity = createEntity()
-		setupTroll(en)
-		var en2 *Entity = createEntity()
-		setupGoblin(en2)
-		en.Position = rl.Vector2{X: float32(rl.GetRandomValue(0, 200)), Y: float32(rl.GetRandomValue(0, 200))}
-		en.Position = roundV2ToTile(en.Position)
-
-		en2.Position = rl.Vector2{X: float32(rl.GetRandomValue(0, 200)), Y: float32(rl.GetRandomValue(0, 200))}
-		en2.Position = roundV2ToTile(en2.Position)
-	}
+	/* for i := 0; i < 2; i++ { */
+	/* 	var en *Entity = createEntity() */
+	/* 	setupTroll(en) */
+	/* 	var en2 *Entity = createEntity() */
+	/* 	setupGoblin(en2) */
+	/* 	en.Position = rl.Vector2{X: float32(rl.GetRandomValue(0, 200)), Y: float32(rl.GetRandomValue(0, 200))} */
+	/* 	en.Position = roundV2ToTile(en.Position) */
+	/**/
+	/* 	en2.Position = rl.Vector2{X: float32(rl.GetRandomValue(0, 200)), Y: float32(rl.GetRandomValue(0, 200))} */
+	/* 	en2.Position = roundV2ToTile(en2.Position) */
+	/* } */
 
 	var playerEntity *Entity = createEntity()
 	setupPlayer(playerEntity)
@@ -304,8 +319,6 @@ func main() {
 
 	var runningMultiplier float32 = 1
 
-	//
-
 	// grabbed entity
 	var grabbedEntity *Entity = nil
 
@@ -313,6 +326,9 @@ func main() {
 		// :clean :reset
 
 		worldFrame = WorldFrame{}
+		var delta_t float32 = rl.GetFrameTime()
+		elapsedTimeGoblin += delta_t
+		elapsedTimeTroll += delta_t
 
 		// :input
 		{
@@ -337,13 +353,33 @@ func main() {
 			}
 
 		}
+		// :spawn Enemies
+		{
+			if elapsedTimeGoblin >= spawnGlobinRate {
+				for i := int32(0); i < spawnGoblinAmount; i++ {
+					var goblinEntity *Entity = createEntity()
+					setupGoblin(goblinEntity)
+					goblinEntity.Position = spawnGoblinPosition
+				}
+				elapsedTimeGoblin = 0
+			}
+
+			if elapsedTimeTroll >= spawnTrollRate {
+				for i := int32(0); i < spawnTrollAmount; i++ {
+					var trollEntity *Entity = createEntity()
+					setupTroll(trollEntity)
+					trollEntity.Position = spawnTrollPosition
+				}
+				elapsedTimeTroll = 0
+			}
+		}
 
 		// :camera
 		{
 			var target rl.Vector2 = playerEntity.Position
 			target.X = target.X + (float32(sprites[SPRITE_PLAYER].Image.Width))/2.0
 			target.Y = target.Y + (float32(sprites[SPRITE_PLAYER].Image.Height))/2.0
-			animateV2ToTarget(&camera.Target, target, rl.GetFrameTime(), 30.0)
+			animateV2ToTarget(&camera.Target, target, delta_t, 30.0)
 		}
 
 		rl.BeginDrawing()
@@ -469,12 +505,14 @@ func main() {
 						}
 					}
 					// :update :positions
+
 					if entity.Type == ARCH_PLAYER {
-
-						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())*runningMultiplier))
+						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)*runningMultiplier))
+					} else if entity.Type == ARCH_TROLL || entity.Type == ARCH_GOBLIN {
+						entity.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(playerEntity.Position, entity.Position)))
+						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)))
 					} else {
-
-						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*rl.GetFrameTime())))
+						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)))
 					}
 
 					var sprite *Sprite = getSprite(entity.SpriteId)
@@ -526,6 +564,11 @@ func main() {
 						if didGlobalCollisionHappen {
 							destroyEntity(firstEntity)
 						}
+					} else if firstEntity.Type == ARCH_GOBLIN || firstEntity.Type == ARCH_TROLL {
+						if rl.CheckCollisionRecs(firstEntity.CollisionRectangle, playerEntity.CollisionRectangle) {
+							playerEntity.Health -= firstEntity.Damage
+						}
+
 					}
 
 				}
