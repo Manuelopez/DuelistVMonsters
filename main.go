@@ -548,8 +548,12 @@ func main() {
 					setupAttackSword(swordAttack, playerEntity.Position, swordAttack.MaxPosition)
 					var playerSprite *Sprite = getSprite(playerEntity.SpriteId)
 					var swingDirectionStart rl.Vector2 = rl.Vector2Normalize(rl.NewVector2(float32(math.Cos(float64(angle))), float32(math.Sin(float64(angle)))))
+					swordAttack.inputAxis = rl.Vector2{X: swingDirectionStart.Y, Y: -swingDirectionStart.X}
 
-					swordAttack.Position = rl.Vector2{X: playerEntity.Position.X + swingDirectionStart.X*float32(playerSprite.Image.Width), Y: playerEntity.Position.Y + swingDirectionStart.Y*float32(playerSprite.Image.Height)}
+					swordAttack.Position = rl.Vector2{
+						X: (playerEntity.Position.X + swingDirectionStart.X*float32(playerSprite.Image.Width)) + (swordAttack.inputAxis.X * 10),
+						Y: playerEntity.Position.Y + swingDirectionStart.Y*float32(playerSprite.Image.Height) + (swordAttack.inputAxis.Y * 10)}
+
 					swordAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(swordAttack.Range))
 				}
 
@@ -724,7 +728,6 @@ func main() {
 
 			// :render ui
 			{
-
 				for i := 0; i < MAX_HAND_COUNT; i++ {
 					var entity *Entity = &hand.Cards[i]
 					if entity.IsValid {
