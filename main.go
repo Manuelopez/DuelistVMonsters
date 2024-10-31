@@ -46,6 +46,7 @@ const (
 	SPRITE_CARD_FIREBALL
 	SPRITE_ATTACK_FIREBALL
 	SPRITE_ATTACK_BASIC
+	SPRITE_ATTACK_SWORD
 	SPRITE_MAX
 )
 
@@ -65,7 +66,10 @@ type Entity struct {
 	Speed  int32
 
 	// for attacks
-	MaxPosition rl.Vector2
+	MaxPosition  rl.Vector2
+	Angle        float32
+	isMelee      bool
+	isProjectile bool
 }
 
 type Card struct {
@@ -90,7 +94,12 @@ var world *World = nil
 var hand *Hand = nil
 var sprites [SPRITE_MAX]Sprite
 
-// :helpers engine functions
+// :helpers :engine functions
+func IsInRange(entity1 *Entity, entity2 *Entity) bool {
+	distance := rl.Vector2Distance(entity1.Position, entity2.Position)
+	return distance <= float32(entity1.Range)
+}
+
 func boolToInt(x bool) int32 {
 	if x {
 		return 1
@@ -195,6 +204,7 @@ func setupTroll(en *Entity, position *rl.Vector2) {
 	en.Health = TROLL_HEALTH
 	en.Damage = 30
 	en.Speed = 50
+	en.Range = 100
 
 	if position != nil {
 		en.Position = *position
@@ -236,6 +246,7 @@ func setupGoblin(en *Entity, position *rl.Vector2) {
 	en.Health = GOBLIN_HEALTH
 	en.Damage = 10
 	en.Speed = 50
+	en.Range = 100
 
 	if position != nil {
 		en.Position = *position
@@ -267,6 +278,7 @@ func setupAttackFireball(en *Entity) {
 	en.Speed = 200
 	en.Health = 1
 	en.Range = 100
+	en.isProjectile = true
 }
 
 func setupAttackBasic(en *Entity) {
@@ -276,6 +288,19 @@ func setupAttackBasic(en *Entity) {
 	en.Speed = 150
 	en.Health = 1
 	en.Range = 85
+	en.isProjectile = true
+}
+
+func setupAttackSword(en *Entity, position, maxPosition rl.Vector2) {
+	en.Type = ARCH_ATTACK
+	en.SpriteId = SPRITE_ATTACK_SWORD
+	en.Damage = 3
+	en.Speed = 40
+	en.Health = 1
+	en.Range = 85
+	en.isProjectile = true
+	en.MaxPosition = maxPosition
+
 }
 
 func main() {
@@ -317,6 +342,8 @@ func main() {
 		Sprite{Image: rl.LoadTexture("./resources/attack_fireball.png")}
 	sprites[SPRITE_ATTACK_BASIC] =
 		Sprite{Image: rl.LoadTexture("./resources/basic_attack.png")}
+	sprites[SPRITE_ATTACK_SWORD] =
+		Sprite{Image: rl.LoadTexture("./resources/sword.png")}
 
 	/* for i := 0; i < 2; i++ { */
 	/* 	var en *Entity = createEntity() */
@@ -413,8 +440,9 @@ func main() {
 		// :camera
 		{
 			var target rl.Vector2 = playerEntity.Position
-			target.X = target.X + (float32(sprites[SPRITE_PLAYER].Image.Width))/2.0
-			target.Y = target.Y + (float32(sprites[SPRITE_PLAYER].Image.Height))/2.0
+			var sprite = getSprite(playerEntity.SpriteId)
+			target.X = target.X + (float32(sprite.Image.Width))/2.0
+			target.Y = target.Y + (float32(sprite.Image.Height))/2.0
 			animateV2ToTarget(&camera.Target, target, delta_t, 30.0)
 		}
 
@@ -501,11 +529,28 @@ func main() {
 				}
 				if IsMouseButtonLeftPressed {
 					IsMouseButtonLeftPressed = false
-					var basicAttack *Entity = createEntity()
-					setupAttackBasic(basicAttack)
-					basicAttack.Position = playerEntity.Position
-					basicAttack.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(mousePositionWorld, playerEntity.Position)))
-					basicAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(basicAttack.Range))
+					/* var basicAttack *Entity = createEntity() */
+					/* setupAttackBasic(basicAttack) */
+					/* basicAttack.Position = playerEntity.Position */
+					/* basicAttack.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(mousePositionWorld, playerEntity.Position))) */
+					/* basicAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(basicAttack.Range)) */
+					var swordAttack *Entity = createEntity()
+
+					// Calculate direction vector
+					deltaX := float64(mousePositionWorld.X - playerEntity.Position.X)
+					deltaY := float64(mousePositionWorld.Y - playerEntity.Position.Y)
+
+					// Calculate angle using arctangent
+					angle := float32(math.Atan2(deltaY, deltaX))
+
+					swordAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(swordAttack.Range))
+					swordAttack.Angle = angle
+					setupAttackSword(swordAttack, playerEntity.Position, swordAttack.MaxPosition)
+					var playerSprite *Sprite = getSprite(playerEntity.SpriteId)
+					var swingDirectionStart rl.Vector2 = rl.Vector2Normalize(rl.NewVector2(float32(math.Cos(float64(angle))), float32(math.Sin(float64(angle)))))
+
+					swordAttack.Position = rl.Vector2{X: playerEntity.Position.X + swingDirectionStart.X*float32(playerSprite.Image.Width), Y: playerEntity.Position.Y + swingDirectionStart.Y*float32(playerSprite.Image.Height)}
+					swordAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(swordAttack.Range))
 				}
 
 				if IsMouseButtonLeftRelased {
@@ -545,8 +590,8 @@ func main() {
 					if entity.Type == ARCH_PLAYER {
 						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)*runningMultiplier))
 					} else if entity.Type == ARCH_TROLL || entity.Type == ARCH_GOBLIN {
-						entity.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(playerEntity.Position, entity.Position)))
-						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)))
+						/* entity.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(playerEntity.Position, entity.Position))) */
+						/* entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t))) */
 					} else {
 						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)))
 					}
@@ -554,8 +599,6 @@ func main() {
 					var sprite *Sprite = getSprite(entity.SpriteId)
 					entity.CollisionRectangle.X = (entity.Position.X - float32(sprite.Image.Width)/2)
 					entity.CollisionRectangle.Y = entity.Position.Y - float32(sprite.Image.Height/2)
-					entity.CollisionRectangle.Width = float32(sprite.Image.Width)
-					entity.CollisionRectangle.Height = float32(sprite.Image.Height)
 
 					// :update :existance
 					if entity.Health <= 0 {
@@ -568,6 +611,25 @@ func main() {
 					grabbedEntity.Position.Y = mousePositionWorld.Y
 				}
 			}
+
+			// :enemy :attack
+			{
+				for i := 0; i < MAX_ENTITY_COUNT; i++ {
+					var entity *Entity = &world.Entities[i]
+					if entity.Type == ARCH_TROLL || entity.Type == ARCH_GOBLIN {
+						if IsInRange(entity, playerEntity) {
+							// TODO enemy attacks
+							/* var sword *Entity = createEntity() */
+							/* var enemySprite = getSprite(entity.SpriteId) */
+							/* var initPosition = rl.Vector2{X: entity.Position.X + float32(enemySprite.Image.Width), Y: entity.Position.Y + float32(enemySprite.Image.Height)} */
+							/**/
+						}
+
+					}
+
+				}
+			}
+
 			// :collision
 			{
 
@@ -600,11 +662,6 @@ func main() {
 						if didGlobalCollisionHappen {
 							destroyEntity(firstEntity)
 						}
-					} else if firstEntity.Type == ARCH_GOBLIN || firstEntity.Type == ARCH_TROLL {
-						if rl.CheckCollisionRecs(firstEntity.CollisionRectangle, playerEntity.CollisionRectangle) {
-							playerEntity.Health -= firstEntity.Damage
-						}
-
 					}
 
 				}
