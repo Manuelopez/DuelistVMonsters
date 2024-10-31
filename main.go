@@ -88,6 +88,7 @@ type WorldFrame struct {
 var worldFrame WorldFrame
 var world *World = nil
 var hand *Hand = nil
+var sprites [SPRITE_MAX]Sprite
 
 // :helpers engine functions
 func boolToInt(x bool) int32 {
@@ -141,6 +142,13 @@ func roundV2ToTile(worldPosition rl.Vector2) rl.Vector2 {
 }
 
 // :helper game functions
+func getSprite(id SpriteId) *Sprite {
+	if id >= 0 && id < SPRITE_MAX {
+		return &sprites[id]
+	}
+	return &sprites[0]
+}
+
 func createCardInHand() *Entity {
 	var entityFound *Entity = nil
 	for i := 0; i < MAX_HAND_COUNT; i++ {
@@ -181,37 +189,66 @@ func destroyEntity(en *Entity) {
 	en.IsValid = false
 }
 
-func setupTroll(en *Entity) {
+func setupTroll(en *Entity, position *rl.Vector2) {
 	en.Type = ARCH_TROLL
 	en.SpriteId = SPRITE_TROLL
 	en.Health = TROLL_HEALTH
 	en.Damage = 30
 	en.Speed = 50
 
+	if position != nil {
+		en.Position = *position
+	} else {
+		en.Position = rl.Vector2{X: 0, Y: 0}
+
+	}
+
+	var sprite *Sprite = getSprite(en.SpriteId)
+	en.CollisionRectangle.X = (en.Position.X - float32(sprite.Image.Width)/2)
+	en.CollisionRectangle.Y = en.Position.Y - float32(sprite.Image.Height/2)
+	en.CollisionRectangle.Width = float32(sprite.Image.Width)
+	en.CollisionRectangle.Height = float32(sprite.Image.Height)
 }
 
-func setupPlayer(en *Entity) {
+func setupPlayer(en *Entity, position *rl.Vector2) {
 	en.Type = ARCH_PLAYER
 	en.SpriteId = SPRITE_PLAYER
-	en.Health = 100
+	en.Health = PLAYER_HEALTH
 	en.Speed = 100
+
+	if position != nil {
+		en.Position = *position
+	} else {
+		en.Position = rl.Vector2{X: 0, Y: 0}
+
+	}
+
+	var sprite *Sprite = getSprite(en.SpriteId)
+	en.CollisionRectangle.X = (en.Position.X - float32(sprite.Image.Width)/2)
+	en.CollisionRectangle.Y = en.Position.Y - float32(sprite.Image.Height/2)
+	en.CollisionRectangle.Width = float32(sprite.Image.Width)
+	en.CollisionRectangle.Height = float32(sprite.Image.Height)
 }
 
-func setupGoblin(en *Entity) {
+func setupGoblin(en *Entity, position *rl.Vector2) {
 	en.Type = ARCH_GOBLIN
 	en.SpriteId = SPRITE_GOBLIN
 	en.Health = GOBLIN_HEALTH
 	en.Damage = 10
 	en.Speed = 50
-}
 
-var sprites [SPRITE_MAX]Sprite
+	if position != nil {
+		en.Position = *position
+	} else {
+		en.Position = rl.Vector2{X: 0, Y: 0}
 
-func getSprite(id SpriteId) *Sprite {
-	if id >= 0 && id < SPRITE_MAX {
-		return &sprites[id]
 	}
-	return &sprites[0]
+
+	var sprite *Sprite = getSprite(en.SpriteId)
+	en.CollisionRectangle.X = (en.Position.X - float32(sprite.Image.Width)/2)
+	en.CollisionRectangle.Y = en.Position.Y - float32(sprite.Image.Height/2)
+	en.CollisionRectangle.Width = float32(sprite.Image.Width)
+	en.CollisionRectangle.Height = float32(sprite.Image.Height)
 }
 
 func setupCardFireball(en *Entity) {
@@ -294,9 +331,8 @@ func main() {
 	/* } */
 
 	var playerEntity *Entity = createEntity()
-	setupPlayer(playerEntity)
 
-	playerEntity.Position = rl.Vector2{X: 0, Y: 0}
+	setupPlayer(playerEntity, &rl.Vector2{X: 0, Y: 0})
 
 	// :camera initialze
 
@@ -358,8 +394,8 @@ func main() {
 			if elapsedTimeGoblin >= spawnGlobinRate {
 				for i := int32(0); i < spawnGoblinAmount; i++ {
 					var goblinEntity *Entity = createEntity()
-					setupGoblin(goblinEntity)
-					goblinEntity.Position = spawnGoblinPosition
+					var goblinPosition = (rl.Vector2AddValue(spawnGoblinPosition, float32(i*20)))
+					setupGoblin(goblinEntity, &goblinPosition)
 				}
 				elapsedTimeGoblin = 0
 			}
@@ -367,8 +403,8 @@ func main() {
 			if elapsedTimeTroll >= spawnTrollRate {
 				for i := int32(0); i < spawnTrollAmount; i++ {
 					var trollEntity *Entity = createEntity()
-					setupTroll(trollEntity)
-					trollEntity.Position = spawnTrollPosition
+					var trollPosition = (rl.Vector2AddValue(spawnTrollPosition, float32(i*20)))
+					setupTroll(trollEntity, &trollPosition)
 				}
 				elapsedTimeTroll = 0
 			}
