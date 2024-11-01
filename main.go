@@ -66,10 +66,13 @@ type Entity struct {
 	Speed  int32
 
 	// for attacks
-	MaxPosition  rl.Vector2
-	Angle        float32
-	isMelee      bool
-	isProjectile bool
+	MaxPosition    rl.Vector2
+	CenterPosition rl.Vector2
+	Angle          float32
+	MaxAngle       float32
+	isMelee        bool
+	Radius         float32
+	isProjectile   bool
 }
 
 type Card struct {
@@ -279,6 +282,12 @@ func setupAttackFireball(en *Entity) {
 	en.Health = 1
 	en.Range = 100
 	en.isProjectile = true
+
+	var sprite *Sprite = getSprite(en.SpriteId)
+	en.CollisionRectangle.X = (en.Position.X - float32(sprite.Image.Width)/2)
+	en.CollisionRectangle.Y = en.Position.Y - float32(sprite.Image.Height/2)
+	en.CollisionRectangle.Width = float32(sprite.Image.Width)
+	en.CollisionRectangle.Height = float32(sprite.Image.Height)
 }
 
 func setupAttackBasic(en *Entity) {
@@ -289,6 +298,12 @@ func setupAttackBasic(en *Entity) {
 	en.Health = 1
 	en.Range = 85
 	en.isProjectile = true
+
+	var sprite *Sprite = getSprite(en.SpriteId)
+	en.CollisionRectangle.X = (en.Position.X - float32(sprite.Image.Width)/2)
+	en.CollisionRectangle.Y = en.Position.Y - float32(sprite.Image.Height/2)
+	en.CollisionRectangle.Width = float32(sprite.Image.Width)
+	en.CollisionRectangle.Height = float32(sprite.Image.Height)
 }
 
 func setupAttackSword(en *Entity, position, maxPosition rl.Vector2) {
@@ -297,9 +312,17 @@ func setupAttackSword(en *Entity, position, maxPosition rl.Vector2) {
 	en.Damage = 3
 	en.Speed = 40
 	en.Health = 1
-	en.Range = 85
-	en.isProjectile = true
+	en.Range = 30
+	en.isMelee = true
 	en.MaxPosition = maxPosition
+	en.Angle = 0
+	en.MaxAngle = 90
+
+	var sprite *Sprite = getSprite(en.SpriteId)
+	en.CollisionRectangle.X = (en.Position.X - float32(sprite.Image.Width)/2)
+	en.CollisionRectangle.Y = en.Position.Y - float32(sprite.Image.Height/2)
+	en.CollisionRectangle.Width = float32(sprite.Image.Width)
+	en.CollisionRectangle.Height = float32(sprite.Image.Height)
 
 }
 
@@ -534,27 +557,6 @@ func main() {
 					/* basicAttack.Position = playerEntity.Position */
 					/* basicAttack.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(mousePositionWorld, playerEntity.Position))) */
 					/* basicAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(basicAttack.Range)) */
-					var swordAttack *Entity = createEntity()
-
-					// Calculate direction vector
-					deltaX := float64(mousePositionWorld.X - playerEntity.Position.X)
-					deltaY := float64(mousePositionWorld.Y - playerEntity.Position.Y)
-
-					// Calculate angle using arctangent
-					angle := float32(math.Atan2(deltaY, deltaX))
-
-					swordAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(swordAttack.Range))
-					swordAttack.Angle = angle
-					setupAttackSword(swordAttack, playerEntity.Position, swordAttack.MaxPosition)
-					var playerSprite *Sprite = getSprite(playerEntity.SpriteId)
-					var swingDirectionStart rl.Vector2 = rl.Vector2Normalize(rl.NewVector2(float32(math.Cos(float64(angle))), float32(math.Sin(float64(angle)))))
-					swordAttack.inputAxis = rl.Vector2{X: swingDirectionStart.Y, Y: -swingDirectionStart.X}
-
-					swordAttack.Position = rl.Vector2{
-						X: (playerEntity.Position.X + swingDirectionStart.X*float32(playerSprite.Image.Width)) + (swordAttack.inputAxis.X * 10),
-						Y: playerEntity.Position.Y + swingDirectionStart.Y*float32(playerSprite.Image.Height) + (swordAttack.inputAxis.Y * 10)}
-
-					swordAttack.MaxPosition = rl.Vector2AddValue(playerEntity.Position, float32(swordAttack.Range))
 				}
 
 				if IsMouseButtonLeftRelased {
@@ -584,7 +586,8 @@ func main() {
 				for i := 0; i < MAX_ENTITY_COUNT; i++ {
 					var entity *Entity = &world.Entities[i]
 					if entity.Type == ARCH_ATTACK {
-						if entity.Position.X > entity.MaxPosition.X || entity.Position.Y > entity.MaxPosition.Y {
+						//TODO MAX DISTANCE ALLOWED CONSTANT
+						if distance := rl.Vector2Distance(entity.Position, entity.MaxPosition); distance < 5 || entity.Angle >= entity.MaxAngle {
 							destroyEntity(entity)
 							continue
 						}
@@ -596,8 +599,14 @@ func main() {
 					} else if entity.Type == ARCH_TROLL || entity.Type == ARCH_GOBLIN {
 						/* entity.inputAxis = rl.Vector2Normalize((rl.Vector2Subtract(playerEntity.Position, entity.Position))) */
 						/* entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t))) */
-					} else {
-						entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)))
+					} else if entity.Type == ARCH_ATTACK {
+						if entity.isMelee {
+
+							entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)))
+
+						} else {
+							entity.Position = rl.Vector2Add(entity.Position, rl.Vector2Scale(entity.inputAxis, (float32(entity.Speed)*delta_t)))
+						}
 					}
 
 					var sprite *Sprite = getSprite(entity.SpriteId)
@@ -752,3 +761,34 @@ func main() {
 	rl.UnloadTexture(sprites[SPRITE_GOBLIN].Image)
 
 }
+
+// :TODO  BACK BURNNERS this is and idea on how to implement melee but have to remember to add the "parent" position entity aka the entity doing the attack
+// for now i want to focus on making the cards that the player is going to use
+
+/* var swordAttack *Entity = createEntity() */
+/**/
+/* // Calculate direction vector */
+/* deltaX := float64(mousePositionWorld.X - playerEntity.Position.X) */
+/* deltaY := float64(mousePositionWorld.Y - playerEntity.Position.Y) */
+/**/
+/* // Calculate angle using arctangent */
+/* angle := float32(math.Atan2(deltaY, deltaX)) */
+/**/
+/* swordAttack.Angle = angle */
+/* setupAttackSword(swordAttack, playerEntity.Position, swordAttack.MaxPosition) */
+/* var playerSprite *Sprite = getSprite(playerEntity.SpriteId) */
+/* var swingDirectionStart rl.Vector2 = rl.Vector2Normalize(rl.NewVector2(float32(math.Cos(float64(angle))), float32(math.Sin(float64(angle))))) */
+/* swordAttack.inputAxis = rl.Vector2{X: swingDirectionStart.Y, Y: -swingDirectionStart.X} */
+/**/
+/* swordAttack.CenterPosition = rl.Vector2{ */
+/*   X: (playerEntity.Position.X + swingDirectionStart.X*float32(playerSprite.Image.Width)), */
+/*   Y: playerEntity.Position.Y + swingDirectionStart.Y*float32(playerSprite.Image.Height)} */
+/**/
+/* swordAttack.Position = rl.Vector2{ */
+/*   X: (playerEntity.Position.X + swingDirectionStart.X*float32(playerSprite.Image.Width)) + (-1 * swordAttack.inputAxis.X * 10), */
+/*   Y: playerEntity.Position.Y + swingDirectionStart.Y*float32(playerSprite.Image.Height) + (-1 * swordAttack.inputAxis.Y * 10)} */
+/**/
+/* swordAttack.Radius = float32(math.Sqrt(math.Pow(float64(swordAttack.Position.X-swordAttack.CenterPosition.X), 2) + math.Pow(float64(swordAttack.Position.Y-swordAttack.CenterPosition.Y), 2))) */
+/**/
+/* swordAttack.MaxPosition = rl.Vector2Add(swordAttack.Position, rl.Vector2Scale(swordAttack.inputAxis, float32(swordAttack.Range))) */
+/**/
